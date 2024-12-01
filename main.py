@@ -2,14 +2,26 @@ import subprocess
 import argparse
 from datetime import datetime
 
-def get_git_log(since_date, until_date):
+def get_git_log(since, until):
     try:
+        # Debugging: print the command to be executed
+        command = [
+            'git', 'log',
+            '--since', since,
+            '--until', until,
+            '--pretty=format:%h | %an | %s | %ad',
+            '--date=short'
+        ]
+        print(f"Executing: {' '.join(command)}")
         result = subprocess.run(
-            ['git', 'log', '--since', since_date, '--until', until_date, '--pretty=format:%h | %an | %s | %ad', '--date=short'],
+            command,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True
         )
+        # Debugging: Print stdout and stderr
+        print(f"STDOUT: {result.stdout}")
+        print(f"STDERR: {result.stderr}")
         if result.returncode != 0:
             raise Exception(result.stderr.strip())
         return result.stdout.strip()
@@ -25,11 +37,21 @@ def write_report(report, output_file):
         print(f"Failed to save the report: {str(e)}")
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate Git reports for the current date by default.")
+    parser = argparse.ArgumentParser(description="Generate Git reports for a specific date and time range.")
     parser.add_argument(
         '-d', '--date',
         help="Specify a date in YYYY-MM-DD format (default: today's date)",
         default=datetime.now().strftime('%Y-%m-%d')  # Default to today's date
+    )
+    parser.add_argument(
+        '--start-time',
+        help="Specify start time in HH:MM format (default: 00:00)",
+        default="00:00"
+    )
+    parser.add_argument(
+        '--end-time',
+        help="Specify end time in HH:MM format (default: 23:59)",
+        default="23:59"
     )
     parser.add_argument(
         '-o', '--output',
@@ -38,15 +60,19 @@ def main():
     )
     args = parser.parse_args()
 
-    # Generate report for the given date
-    since_date = args.date
-    until_date = args.date
-    print(f"Generating report for {since_date}...")
-    
-    git_log = get_git_log(since_date, until_date)
+    # Combine date with time to form the full datetime range
+    since = f"{args.date} {args.start_time}"
+    until = f"{args.date} {args.end_time}"
+
+    print(f"Generating report from {since} to {until}...")
+
+    git_log = get_git_log(since, until)
     if git_log.startswith("Error"):
         print(git_log)
+    elif not git_log:
+        print("No commits found for the given date and time range.")
     else:
+        print("Git log fetched successfully.")
         print(git_log)
         write_report(git_log, args.output)
 
